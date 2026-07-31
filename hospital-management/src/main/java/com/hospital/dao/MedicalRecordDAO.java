@@ -24,7 +24,8 @@ public class MedicalRecordDAO {
     public boolean completeConsultation(int appointmentId, int doctorId, String diagnosis,
                                          String notes, List<Prescription> prescriptions) {
 
-        String updateApptSql = "UPDATE appointment SET status = 'COMPLETED' WHERE appointment_id = ?";
+        String updateApptSql = "UPDATE appointment SET status = 'COMPLETED' "
+                + "WHERE appointment_id = ? AND doctor_id = ? AND status = 'BOOKED'";
         String insertRecordSql = "INSERT INTO medical_record (appointment_id, diagnosis, notes) VALUES (?, ?, ?)";
         String insertPrescriptionSql = "INSERT INTO prescription (record_id, medicine_name, dosage, duration_days, cost) VALUES (?, ?, ?, ?, ?)";
         String getFeeSql = "SELECT consultation_fee FROM doctor WHERE doctor_id = ?";
@@ -38,7 +39,11 @@ public class MedicalRecordDAO {
             // 1. Mark appointment completed
             try (PreparedStatement ps = con.prepareStatement(updateApptSql)) {
                 ps.setInt(1, appointmentId);
-                ps.executeUpdate();
+                ps.setInt(2, doctorId);
+                if (ps.executeUpdate() != 1) {
+                    con.rollback();
+                    return false;
+                }
             }
 
             // 2. Insert medical record
@@ -49,7 +54,9 @@ public class MedicalRecordDAO {
                 ps.setString(3, notes);
                 ps.executeUpdate();
                 try (ResultSet keys = ps.getGeneratedKeys()) {
-                    keys.next();
+                    if (!keys.next()) {
+                        throw new SQLException("Medical record was created without a generated ID.");
+                    }
                     recordId = keys.getInt(1);
                 }
             }
@@ -59,11 +66,16 @@ public class MedicalRecordDAO {
             if (prescriptions != null) {
                 try (PreparedStatement ps = con.prepareStatement(insertPrescriptionSql)) {
                     for (Prescription pres : prescriptions) {
+                        if (pres == null || pres.getMedicineName() == null || pres.getMedicineName().isBlank()
+                                || pres.getDurationDays() < 0
+                                || (pres.getCost() != null && pres.getCost().signum() < 0)) {
+                            throw new SQLException("Invalid prescription data.");
+                        }
                         ps.setInt(1, recordId);
                         ps.setString(2, pres.getMedicineName());
                         ps.setString(3, pres.getDosage());
                         ps.setInt(4, pres.getDurationDays());
-                        ps.setBigDecimal(5, pres.getCost());
+                        ps.setBigDecimal(5, pres.getCost() != null ? pres.getCost() : BigDecimal.ZERO);
                         ps.addBatch();
                         medicineTotal = medicineTotal.add(pres.getCost() != null ? pres.getCost() : BigDecimal.ZERO);
                     }

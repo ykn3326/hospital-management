@@ -19,6 +19,13 @@ public class AppointmentServlet extends HttpServlet {
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        HttpSession session = req.getSession(false);
+        Integer patientId = (session != null) ? (Integer) session.getAttribute("patientId") : null;
+        if (patientId == null) {
+            resp.sendRedirect("login");
+            return;
+        }
+
         // Show doctor search results (optionally filtered by specialization)
         String specialization = req.getParameter("specialization");
         req.setAttribute("doctors", new DoctorDAO().search(specialization));
