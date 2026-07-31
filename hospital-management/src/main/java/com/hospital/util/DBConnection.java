@@ -12,9 +12,10 @@ import java.sql.SQLException;
  */
 public class DBConnection {
 
-    private static final String DB_URL = "jdbc:mysql://localhost:3306/hospital_db?useSSL=false&serverTimezone=UTC";
-    private static final String DB_USER = "root";
-    private static final String DB_PASSWORD = "your_mysql_password";
+    private static final String DB_URL = databaseUrl();
+    private static final String DB_USER = environment("DB_USER", environment("MYSQLUSER", "root"));
+    private static final String DB_PASSWORD = environment("DB_PASSWORD",
+            environment("MYSQLPASSWORD", "your_mysql_password"));
 
     static {
         try {
@@ -30,5 +31,23 @@ public class DBConnection {
      */
     public static Connection getConnection() throws SQLException {
         return DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
+    }
+
+    private static String databaseUrl() {
+        String explicitUrl = System.getenv("DB_URL");
+        if (explicitUrl != null && !explicitUrl.isBlank()) {
+            return explicitUrl;
+        }
+
+        String host = environment("MYSQLHOST", "localhost");
+        String port = environment("MYSQLPORT", "3306");
+        String database = environment("MYSQLDATABASE", "hospital_db");
+        return "jdbc:mysql://" + host + ":" + port + "/" + database
+                + "?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true";
+    }
+
+    private static String environment(String name, String defaultValue) {
+        String value = System.getenv(name);
+        return value == null || value.isBlank() ? defaultValue : value;
     }
 }
