@@ -33,7 +33,7 @@ public class RegisterServlet extends HttpServlet {
 
         // Basic input validation
         if (name == null || name.isBlank() || email == null || email.isBlank()
-                || password == null || password.length() < 6) {
+                || password == null || password.length() < 6 || phone == null || phone.isBlank()) {
             req.setAttribute("error", "Please fill all required fields. Password must be at least 6 characters.");
             req.getRequestDispatcher("/register.jsp").forward(req, resp);
             return;
@@ -54,7 +54,13 @@ public class RegisterServlet extends HttpServlet {
         p.setPasswordHash(PasswordUtil.hash(password));
         p.setPhone(phone);
         p.setGender(gender);
-        p.setDob(dobStr != null && !dobStr.isBlank() ? LocalDate.parse(dobStr) : null);
+        try {
+            p.setDob(dobStr != null && !dobStr.isBlank() ? LocalDate.parse(dobStr) : null);
+        } catch (java.time.format.DateTimeParseException e) {
+            req.setAttribute("error", "Please provide a valid date of birth.");
+            req.getRequestDispatcher("/register.jsp").forward(req, resp);
+            return;
+        }
         p.setAddress(address);
 
         int newId = dao.registerPatient(p);
